@@ -3,3 +3,4 @@ __pycache__/
 cifar-100-python/
 train_dir/
 *.ipynb
+*.pdf

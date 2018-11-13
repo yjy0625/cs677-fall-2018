@@ -10,6 +10,7 @@ class Model(object):
         self.apply_batch_norm = self.config.apply_batch_norm
         self.add_more_layers = self.config.add_more_layers
         self.larger_filter_size = self.config.larger_filter_size
+        self.add_dropout = self.config.add_dropout
         self.num_superclasses = self.config.num_superclasses
         self.num_classes = self.config.num_classes
         
@@ -19,6 +20,7 @@ class Model(object):
         self.images = tf.placeholder(name='images', dtype=tf.float32, shape=[None, self.input_height, self.input_width, self.c_dim])
         self.coarse_labels = tf.placeholder(name='coarse_labels', dtype=tf.int32, shape=[None])
         self.fine_labels = tf.placeholder(name='fine_labels', dtype=tf.int32, shape=[None])
+        self.label_mapping = tf.placeholder(name='label_mapping', dtype=tf.int32, shape=[self.num_classes])
         self.is_training = tf.placeholder(name='is_training', dtype=tf.bool, shape=[])
         
         self.build_model()
@@ -26,7 +28,9 @@ class Model(object):
     def build_model(self):
         # get logits
         logits = self.lenet(self.images, is_training=self.is_training)
+        self.probs = tf.nn.softmax(logits)
         self.pred = tf.cast(tf.argmax(logits, axis=1), tf.int32)
+        self.superclass_pred = tf.cast(tf.gather(self.label_mapping, self.pred), tf.int32)
         
         # build loss
         self.loss = tf.losses.softmax_cross_entropy(tf.one_hot(self.fine_labels, self.num_classes), logits)
@@ -44,16 +48,17 @@ class Model(object):
         
         top_1 = tf.cast(tf.equal(tf.cast(tf.argmax(logits, 1), tf.int32), self.fine_labels), tf.float32)
         self.accuracy = tf.reduce_mean(top_1)
-        self.per_superclass_accuracy = tf.reduce_mean(coarse_labels_dn * top_1, axis=1)
-        self.per_class_accuracy = tf.reduce_mean(fine_labels_dn * top_1, axis=1)
+        self.per_superclass_accuracy = tf.reduce_sum(coarse_labels_dn * top_1, 1) / tf.reduce_sum(coarse_labels_dn, 1)
+        self.per_class_accuracy = tf.reduce_sum(fine_labels_dn * top_1, 1) / tf.reduce_sum(fine_labels_dn, 1)
         
         top_5 = tf.reduce_sum(tf.cast(tf.equal(tf.nn.top_k(logits, k=5, sorted=True)[1], 
                 tf.expand_dims(self.fine_labels, 1)), tf.float32), axis=1)
         self.top_5_accuracy = tf.reduce_mean(top_5)
-        self.top_5_per_superclass_accuracy = tf.reduce_mean(coarse_labels_dn * top_5, axis=1)
-        self.top_5_per_class_accuracy = tf.reduce_mean(fine_labels_dn * top_5, axis=1)
+        self.top_5_per_superclass_accuracy = tf.reduce_sum(coarse_labels_dn * top_5, 1) / tf.reduce_sum(coarse_labels_dn, 1)
+        self.top_5_per_class_accuracy = tf.reduce_sum(fine_labels_dn * top_5, 1) / tf.reduce_sum(fine_labels_dn, 1)
         
         self.confusion_matrix = tf.confusion_matrix(self.pred, self.fine_labels)
+        self.superclass_confusion_matrix = tf.confusion_matrix(self.superclass_pred, self.coarse_labels)
         
         # add summaries to Tensorboard
         self.add_summary("global_step", self.global_step)
@@ -138,20 +143,31 @@ class Model(object):
             _ = tf.layers.flatten(_, 'flatten')
             print('[Layer: flatten] {} {}'.format('flatten', _.get_shape().as_list()))
 
-            _ = tf.layers.dense(_, 1024, 
+            _ = tf.layers.dense(_, 120, 
                                 activation=tf.nn.relu, 
                                 kernel_initializer=initializer,
                                 name='fc3')
             print('[Layer: fc] {} {}'.format('fc3', _.get_shape().as_list()))
 
-            _ = tf.layers.dropout(_, training=is_training, name='dropout')
-            print('[Layer: dropout] {} {}'.format('dropout', _.get_shape().as_list()))
+            if self.add_dropout:
+                _ = tf.layers.dropout(_, training=is_training, name='dropout3')
+                print('[Layer: dropout] {} {}'.format('dropout3', _.get_shape().as_list()))
+
+            _ = tf.layers.dense(_, 84, 
+                                activation=tf.nn.relu, 
+                                kernel_initializer=initializer,
+                                name='fc4')
+            print('[Layer: fc] {} {}'.format('fc4', _.get_shape().as_list()))
+            
+            if self.add_dropout:
+                _ = tf.layers.dropout(_, training=is_training, name='dropout4')
+                print('[Layer: dropout] {} {}'.format('dropout4', _.get_shape().as_list()))
 
             logits = tf.layers.dense(_, num_classes, 
                                      activation=None,
                                      kernel_initializer=initializer,
-                                     name='fc4')
-            print('[Layer: fc] {} {}'.format('fc4', logits.get_shape().as_list()))
+                                     name='fc5')
+            print('[Layer: fc] {} {}'.format('fc5', logits.get_shape().as_list()))
 
         return logits
 

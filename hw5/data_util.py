@@ -60,11 +60,11 @@ def preprocess_data(data, mean_image, augment=False):
         orignal_size = images.shape[0]
         
         images = augment_images_by_cropping(images)
-        print("Aug #1: {}".format(images.shape))
+        print("Augmentation Step #1: {}".format(images.shape))
         images = augment_images_by_flipping(images)
-        print("Aug #2: {}".format(images.shape))
+        print("Augmentation Step #2: {}".format(images.shape))
         images = augment_images_by_cropping(images)
-        print("Aug #3: {}".format(images.shape))
+        print("Augmentation Step #3: {}".format(images.shape))
         
         multiplier = int(images.shape[0] / orignal_size)
         
@@ -85,7 +85,6 @@ def augment_images_by_cropping(images):
         (int((H - h) / 2), int((W - w) / 2))
     ]
     augmented_images = []
-    # augmented_images.append(images)
     for crop_start in crop_starts:
         start_h, start_w = crop_start
         augmented_images.append(enlarged_images[:, start_h:start_h + h, start_w:start_w + w,:])
@@ -93,7 +92,7 @@ def augment_images_by_cropping(images):
 
 def augment_images_by_flipping(images):
     augmented_images = []
-    # augmented_images.append(images)
+    augmented_images.append(images)
     augmented_images.append(np.stack([np.fliplr(img) for img in images]))
     return np.concatenate(augmented_images)
 
@@ -101,3 +100,49 @@ def get_metadata(dir, filename):
     with open(os.path.join(dir, filename), 'rb') as f:
         label_info = pickle.load(f)
     return label_info
+
+''' Computes mapping from fine labels to corresponding superclass.
+
+Args:
+    metadata: dictionary containing metadata for the dataset.
+
+Returns:
+    Numpy array where each element is the superclass label for corresponding
+    fine label.
+'''
+def get_label_mapping(metadata):
+    mapping_str = '''aquatic mammals	beaver, dolphin, otter, seal, whale
+fish	aquarium fish, flatfish, ray, shark, trout
+flowers	orchid, poppy, rose, sunflower, tulip
+food containers	bottle, bowl, can, cup, plate
+fruit and vegetables	apple, mushroom, orange, pear, sweet pepper
+household electrical devices	clock, keyboard, lamp, telephone, television
+household furniture	bed, chair, couch, table, wardrobe
+insects	bee, beetle, butterfly, caterpillar, cockroach
+large carnivores	bear, leopard, lion, tiger, wolf
+large man-made outdoor things	bridge, castle, house, road, skyscraper
+large natural outdoor scenes	cloud, forest, mountain, plain, sea
+large omnivores and herbivores	camel, cattle, chimpanzee, elephant, kangaroo
+medium mammals	fox, porcupine, possum, raccoon, skunk
+non-insect invertebrates	crab, lobster, snail, spider, worm
+people	baby, boy, girl, man, woman
+reptiles	crocodile, dinosaur, lizard, snake, turtle
+small mammals	hamster, mouse, rabbit, shrew, squirrel
+trees	maple tree, oak tree, palm tree, pine tree, willow tree
+vehicles 1	bicycle, bus, motorcycle, pickup truck, train
+vehicles 2	lawn mower, rocket, streetcar, tank, tractor'''
+    
+    lines = [s.split('\t') for s in mapping_str.splitlines()]
+    mapping = {item[0] : item[1].split(', ') for item in lines}
+    
+    mapping_coarse_to_fine = {}
+    for key, value in mapping.items():
+        mapping_coarse_to_fine[metadata['coarse_label_names'].index(key.replace(' ', '_'))] \
+            = [metadata['fine_label_names'].index(item.replace(' ', '_')) for item in value]
+
+    mapping_fine_to_coarse = np.zeros((100,), dtype=np.int32)
+    for key, values in mapping_coarse_to_fine.items():
+        for value in values:
+            mapping_fine_to_coarse[value] = key
+
+    return mapping_fine_to_coarse
