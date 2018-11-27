@@ -43,7 +43,7 @@ def deconv2d(inputs, num_outputs,
                                        activation=activation,
                                        kernel_initializer=initializer,
                                        name=name)
-    print('[layer: deconv2d] {} {}'.format(name, shape(output)))
+    print('[Layer: deconv2d] {} {}'.format(name, shape(output)))
     return output
 
 def bilinear_deconv2d(inputs, num_outputs,
@@ -59,5 +59,5 @@ def bilinear_deconv2d(inputs, num_outputs,
         output = tf.image.resize_bilinear(inputs, [h, w])
         output = conv2d(output, num_outputs, kernel_size, padding=padding,
                         activation=activation, initializer=initializer)
-    print('[layer: bilinear-deconv2d] {} {}'.format(name, shape(output)))
+    print('[Layer: bilinear-deconv2d] {} {}'.format(name, shape(output)))
     return output
