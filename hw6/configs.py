@@ -9,7 +9,7 @@ flags.DEFINE_string("prefix", "default", "Nickname for the experiment [default]"
 flags.DEFINE_boolean("use_bilinear_deconv2d", False, "Whether to use bilinear deconv2d [False]")
 
 # training params
-flags.DEFINE_integer("max_steps", 100000, "Number of steps to train. [5000]")
+flags.DEFINE_integer("max_steps", 28000, "Number of steps to train. [5000]")
 flags.DEFINE_float("learning_rate", 1e-3, "Learning rate for the model. [1e-3]")
 flags.DEFINE_float("momentum", 0.99, "Momentum for the optimizer. [0.99]")
 flags.DEFINE_integer("batch_size", 1, "Number of images in batch [1]")
